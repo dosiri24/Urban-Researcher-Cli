@@ -69,3 +69,10 @@ class ConfigManager:
             return "*" * len(value)
         return value[:keep] + "*" * (len(value) - keep * 2) + value[-keep:]
 
+    def unset(self, key: str) -> bool:
+        data = self._read()
+        existed = key in data
+        if existed:
+            del data[key]
+            self._write(data)
+        return existed

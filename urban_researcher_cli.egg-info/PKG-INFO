@@ -1,3 +1,16 @@
+Metadata-Version: 2.4
+Name: urban-researcher-cli
+Version: 0.1.0
+Summary: AI 기반 도시 연구 자동화 CLI (가상 랩 미팅)
+Author: Urban Researcher
+Keywords: cli,ai,research,urban
+Classifier: Programming Language :: Python :: 3
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Science/Research
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: click>=8.1.3
+
 # Urban Researcher CLI (가상 랩 미팅)
 
 AI 기반 도시 연구 자동화 CLI. 먼저 CLI 틀을 안정화(Shell-first)하고, 이후 MCP 도구를 하나씩 증분 통합합니다.
@@ -35,17 +48,6 @@ python cli.py project status --dir urban_regeneration_study
 python cli.py --verbose --help
 ```
 
-## 제미나이 대화형 REPL
-- 첫 실행 시 API 키 자동 프롬프트가 뜹니다(미설정일 때). 입력하면 저장됩니다.
-- 수동 설정(선택):
-  - ENV: `export UR_GEMINI_API_KEY="YOUR_KEY"` (또는 `GOOGLE_API_KEY`)
-  - 설정: `python cli.py config set --key gemini-api-key --value YOUR_KEY`
-- 실행
-```
-urban chat --temperature 0.7   # 모델은 gemini-2.5-pro로 고정
-```
-- 로그는 현재 경로 또는 `--project-root`의 `logs/` 폴더에 `chat_*.md`로 저장됩니다.
-
 ## 설계 메모
 - 로깅: `--verbose` 시 DEBUG. 기본은 INFO. 형식: `time | level | logger | message`
 - 에러 처리: 사용자 메시지는 `click.ClickException` 기반으로 일관 출력
@@ -60,20 +62,3 @@ urban chat --temperature 0.7   # 모델은 gemini-2.5-pro로 고정
 ## 다음 단계
 - Debate MVP(Phase 4) 설계/구현 후 단일 도구(CodeInterpreter)를 순차 통합
 - 세부 단계는 `앞으로의_작업_계획서.md` 참조
-
-## 전역 실행(콘솔 스크립트)
-프로젝트 루트에서 설치:
-```
-python3 -m pip install -e .
-```
-이후 다음 명령으로 실행할 수 있습니다:
-```
-urban --help
-urban-cli --help    # 다른 도구와 이름이 충돌할 수 있음
-Urban-cli --help    # 대소문자 변형도 제공
-```
-만약 `urban-cli`가 다른 도구와 충돌한다면(macOS):
-- 현재 어떤 바이너리가 실행되는지 확인: `which -a urban-cli`
-- 우리 도구를 우선 사용하려면:
-  - 간단: `alias Urban-cli="urban"` 를 `~/.zshrc`에 추가 후 `source ~/.zshrc`
-  - 또는 PATH에서 Python 스크립트 경로를 앞에 배치: `export PATH="/Library/Frameworks/Python.framework/Versions/3.11/bin:$PATH"`

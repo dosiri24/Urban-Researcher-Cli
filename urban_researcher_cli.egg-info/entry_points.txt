@@ -1,0 +1,4 @@
+[console_scripts]
+Urban-cli = cli:main
+urban = cli:main
+urban-cli = cli:main

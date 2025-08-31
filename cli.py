@@ -8,13 +8,14 @@ from urban_cli.version import __version__
 from urban_cli.logutil import setup_logging
 from urban_cli.config import ConfigManager
 from urban_cli.project import ProjectManager
+from urban_cli.chat import run_chat_repl
 
 
 class FriendlyException(click.ClickException):
     pass
 
 
-@click.group(context_settings={"help_option_names": ["-h", "--help"]})
+@click.group(context_settings={"help_option_names": ["-h", "--help"]}, invoke_without_command=True)
 @click.option("--verbose", "verbose", is_flag=True, help="Enable verbose logging (DEBUG)")
 @click.version_option(version=__version__, prog_name="Urban Researcher CLI")
 @click.pass_context
@@ -23,6 +24,68 @@ def cli(ctx: click.Context, verbose: bool):
     setup_logging(debug=verbose)
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
+    _maybe_prompt_gemini_key()
+
+    # 기본 동작: 서브커맨드가 없고 TTY인 경우 chat REPL로 진입
+    try:
+        import sys as _sys
+        if ctx.invoked_subcommand is None and _sys.stdin.isatty() and _sys.stdout.isatty():
+            # 도움말/버전 요청은 Click이 자체 처리하므로 여기선 REPL 진입
+            ctx.invoke(chat, system=None, temperature=0.7, project_root=None)
+            # chat 종료 후 즉시 반환
+            raise click.exceptions.Exit(0)
+    except Exception:
+        # 문제 시에는 기본 도움말로 폴백 (조용히 무시)
+        pass
+
+
+def _maybe_prompt_gemini_key() -> None:
+    """프로그램 시작 시 Gemini API 키가 없으면 한 번 입력받아 저장.
+
+    - 우선순위: ENV(UR_GEMINI_API_KEY/GOOGLE_API_KEY) 또는 config(gemini-api-key/google-api-key)
+    - 도움말/버전 조회 시에는 프롬프트 생략
+    - TTY가 아닐 경우 생략
+    """
+    import os
+    import sys as _sys
+    from urban_cli.config import ConfigManager
+
+    # 도움말/버전만 보는 경우 스킵
+    argv = set(_sys.argv[1:])
+    if {"--help", "-h", "--version"} & argv:
+        return
+    # 비대화형 스킵
+    try:
+        if not _sys.stdin.isatty() or not _sys.stdout.isatty():
+            return
+    except Exception:
+        return
+
+    # 이미 설정되어 있으면 스킵
+    for env in ("UR_GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        if os.environ.get(env, "").strip():
+            return
+    cm = ConfigManager()
+    for key in ("gemini-api-key", "google-api-key"):
+        v = cm.get(key)
+        if v and str(v).strip():
+            return
+
+    # 입력 받기
+    try:
+        api_key = click.prompt(
+            "Gemini API 키가 설정되어 있지 않습니다. 입력해 주세요 (엔터로 건너뜀)",
+            hide_input=True,
+            default="",
+            show_default=False,
+        ).strip()
+    except (EOFError, KeyboardInterrupt):
+        return
+
+    if api_key:
+        # 우선 세션(ENV)에만 적용. 첫 정상 응답 시 자동 영구 저장.
+        os.environ["UR_GEMINI_API_KEY"] = api_key
+        click.echo("Gemini API 키가 세션에 적용되었습니다. 첫 정상 응답 후 자동 저장됩니다.")
 
 
 # -----------------
@@ -125,6 +188,26 @@ def run(auto: bool):
         click.echo("'run --auto'는 추후 Phase 7에서 구현됩니다.")
     else:
         click.echo("'run'은 향후 연구 파이프라인 실행용 커맨드입니다.")
+
+
+# -----------------
+# Chat (Gemini)
+# -----------------
+
+
+@cli.command()
+@click.option("--system", default=None, help="시스템 프롬프트(미지정 시 기본값)")
+@click.option("--temperature", default=0.7, show_default=True, type=float, help="창의성 조절")
+@click.option("--project-root", type=click.Path(path_type=Path), default=None, help="로그 저장용 프로젝트 루트")
+def chat(system: str | None, temperature: float, project_root: Path | None):
+    """제미나이 기반 대화형 REPL."""
+    if system is None:
+        system = (
+            "너는 도시 연구를 지원하는 AI 조교야. 사용자의 자연어 요청을 명확히 이해하고, "
+            "필요시 다음 액션을 제안하거나 후속 질문을 통해 문제를 구체화해. 답변은 간결하고 실행 가능하게 작성해."
+        )
+    # 모델은 고정: gemini-2.5-pro
+    run_chat_repl(model="gemini-2.5-pro", system=system, temperature=temperature, project_root=project_root)
 
 
 # -----------------
